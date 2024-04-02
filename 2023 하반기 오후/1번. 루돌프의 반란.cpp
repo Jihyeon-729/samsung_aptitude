@@ -1,0 +1,357 @@
+#include <iostream>
+#include <string.h>
+#include <vector>
+#include <cmath>
+
+using namespace std;
+
+#define RUDOLF 31
+
+typedef struct {
+    int y, x;
+} Location;
+
+typedef struct {
+    int score;
+    int status; // 0:OK, 1:faint, 2:Out
+    int wakeup_time;
+    Location location;
+} Santa;
+
+typedef struct {
+    Location location;
+} Rudolf;
+
+int N, M, P, C, D;
+
+int Santa_dy[4] = {-1, 0, 1, 0};
+int Santa_dx[4] = {0, 1, 0, -1};
+int Rudolf_dy[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
+int Rudolf_dx[8] = {0, 1, 1, 1, 0, -1, -1, -1};
+
+int board[51][51];
+Rudolf rudolf;
+vector<Santa> santa;
+
+void print_santa(void);
+void print_board(void);
+
+void init(void);
+void wakeup(void);
+bool checkover(void);
+void print_score(void);
+
+void move_Rudolf(void);
+int find_nearest_santa(void);
+int get_dist(int fy, int fx, int ty, int tx);
+void dash_Rudolf(int n);
+void crash_Rudolf(int n, int y, int x, int dir);
+
+void move_Santa(void);
+void dash_Santa(int n);
+void crash_Santa(int n, int y, int x, int dir);
+
+void interaction(int n, int y, int x, int diry, int dirx);
+
+int main(void) {
+
+    ios_base::sync_with_stdio(false);
+    cin.tie(0); cout.tie(0);
+
+    init();
+    while(M--) {
+        wakeup();
+        //cout << "TURN #" << M << "\n";
+        
+        move_Rudolf();
+        //print_santa();
+        //print_board();
+
+        move_Santa();
+        //print_board();
+        //print_santa();
+
+        bool gameover = checkover();
+        if(gameover) break;
+        //print_santa();
+    }
+    print_score();
+
+    return 0;
+}
+
+void print_santa(void) {
+    for(int i=1; i<=P; i++) {
+        Santa s = santa[i];
+        //cout << "#" << i << " - score " << s.score << "\n";
+        //cout << "santa #" << i << "\n";
+        //cout << "score : " << s.score << "\n";
+        //cout << "status : " << s.status << " / wakeup_time : " << s.wakeup_time << "\n";
+        //cout << "location : (" << s.location.y << "," << s.location.x << ")\n";
+    } cout << "\n";
+}
+
+void print_board(void) {
+    for(int i=1; i<=N; i++) {
+        for(int j=1; j<=N; j++) {
+            cout << board[i][j] << " ";
+        } cout << "\n";
+    } cout << "\n";
+}
+
+void init(void) {
+    cin >> N >> M >> P >> C >> D;
+    memset(board, 0, sizeof(board));
+
+    int n, r, c;
+    cin >> r >> c;
+    rudolf.location.y = r;
+    rudolf.location.x = c;
+    board[r][c] = RUDOLF;
+
+    santa.resize(P+1);
+    for(int i=0; i<P; i++) {
+        cin >> n >> r >> c;
+        santa[n].score = 0;
+        santa[n].status = 0;
+        santa[n].wakeup_time = 0;
+        santa[n].location.y = r;
+        santa[n].location.x = c;
+        board[r][c] = n;
+    }
+}
+
+void wakeup(void) {
+    for(int i=1; i<=P; i++) {
+        if(santa[i].status == 1 && santa[i].wakeup_time == M) {
+            //cout << "santa #" << i << " woken up!!!!\n";
+            santa[i].status = 0;
+        }
+    }
+}
+
+bool checkover(void) {
+    bool notover = false;
+    for(int i=1; i<=P; i++) {
+        if(santa[i].status != 2) {
+            santa[i].score++;
+            notover = true;
+        }
+    }
+    if(notover) return false;
+    else return true;
+}
+
+void print_score(void) {
+
+    for(int i=1; i<=P; i++) {
+        cout << santa[i].score << " ";
+    } cout << "\n";
+}
+
+void move_Rudolf(void) {
+    int n = find_nearest_santa();
+    dash_Rudolf(n);
+}
+
+int find_nearest_santa(void) 
+{
+    int ry, rx, sy, sx;
+    int nearest_dist = 5001;
+    int nearest_santa;
+
+    ry = rudolf.location.y;
+    rx = rudolf.location.x;
+    for(int i=1; i<=P; i++) {
+        
+        if(santa[i].status < 2) {   // 기절하지 않았다면
+            sy = santa[i].location.y;
+            sx = santa[i].location.x;
+            int dist = get_dist(sy, sx, ry, rx);
+            if(nearest_dist > dist) {
+                nearest_dist = dist;
+                nearest_santa = i;
+            }
+            else if (nearest_dist == dist) {
+                Location nsl = santa[nearest_santa].location;
+                if(sy == nsl.y) {
+                    nearest_santa = sx > nsl.x? i : nearest_santa;
+                } else {
+                    nearest_santa = sy > nsl.y? i : nearest_santa;
+                }
+            }
+        }
+    }
+
+    //cout << "nearest_santa : " << nearest_santa << "\n";
+    return nearest_santa;
+}
+
+int get_dist(int fy, int fx, int ty, int tx) {
+    return pow(ty-fy, 2) + pow(tx-fx, 2);
+}
+
+void dash_Rudolf(int n) {
+    int ry = rudolf.location.y;
+    int rx = rudolf.location.x;
+    int sy = santa[n].location.y;
+    int sx = santa[n].location.x;
+
+    int dir = 0;
+    int dist = get_dist(ry, rx, sy, sx);
+
+    for(int i=0; i<8; i++) {
+        int ny = ry + Rudolf_dy[i];
+        int nx = rx + Rudolf_dx[i];
+        if (dist > get_dist(sy, sx, ny, nx)) {
+            dir = i;
+            dist = get_dist(sy, sx, ny, nx);
+        }
+    }
+
+    int ny = ry + Rudolf_dy[dir];
+    int nx = rx + Rudolf_dx[dir];
+
+    // 돌진 자리에 산타가 있다면
+    if(board[ny][nx] != 0) {
+        crash_Rudolf(board[ny][nx], ny, nx, dir);
+    }
+
+    board[ry][rx] = 0;
+    board[ny][nx] = RUDOLF;
+    
+    rudolf.location.y = ny;
+    rudolf.location.x = nx;
+
+}
+
+void crash_Rudolf(int n, int y, int x, int dir) {
+    santa[n].score += C;
+    santa[n].status = 1;
+    santa[n].wakeup_time = M-2;
+    int ny = y + Rudolf_dy[dir]*C;
+    int nx = x + Rudolf_dx[dir]*C;
+
+    //cout << "ny, nx = (" << ny << "," << nx << ")\n";
+
+    if(ny<1||ny>N || nx<1||nx>N) {
+        santa[n].status = 2;
+        board[y][x] = 0;
+    }
+    else {
+        if(board[ny][nx] != 0)
+            interaction(board[ny][nx], ny, nx, Rudolf_dy[dir], Rudolf_dx[dir]);
+        board[ny][nx] = n;
+        santa[n].location.y = ny;
+        santa[n].location.x = nx;
+    }
+
+    return;
+}
+
+void move_Santa(void) {
+
+    for(int i=1; i<=P; i++) {
+        if(santa[i].status == 0) {
+            dash_Santa(i);
+        }
+    }
+
+}
+
+void dash_Santa(int n) {
+
+    int ry = rudolf.location.y;
+    int rx = rudolf.location.x;
+    int sy = santa[n].location.y;
+    int sx = santa[n].location.x;
+
+    int dir = 0;
+    int dist = get_dist(ry, rx, sy, sx);
+
+    bool move_flag = 0;
+
+    for(int i=0; i<4; i++) {
+        
+        int ny = sy + Santa_dy[i];
+        int nx = sx + Santa_dx[i];
+        // 게임판 밖이 아니고
+        if(0<ny&&ny<=N && 0<nx&&nx<=N) {
+            // 다른 산타 있는 자리가 아닐 때
+            if (board[ny][nx] < 1 || board[ny][nx] > P) {
+                if (dist > get_dist(ry, rx, ny, nx)) {
+                    move_flag = true;
+                    dir = i;
+                    dist = get_dist(ry, rx, ny, nx);
+                }
+            }
+        }
+    }
+
+    if(move_flag) {
+        int ny = sy + Santa_dy[dir];
+        int nx = sx + Santa_dx[dir];
+
+        // 돌진 자리에 루돌프가 있다면
+        if(board[ny][nx] == RUDOLF) {
+            board[sy][sx] = 0;
+            crash_Santa(n, ny, nx, dir);
+        }
+        else  {
+            board[sy][sx] = 0;
+            board[ny][nx] = n;
+            santa[n].location.y = ny;
+            santa[n].location.x = nx;
+        }
+    }
+}
+
+void crash_Santa(int n, int y, int x, int dir) {
+
+    santa[n].score += D;
+    santa[n].status = 1;
+    santa[n].wakeup_time = M-2;
+
+    // 산타는 자신이 이동해온 반대 방향으로 D 칸 만큼 밀려나게 됨
+    int ny = y + Santa_dy[(dir+2)%4]*D;
+    int nx = x + Santa_dx[(dir+2)%4]*D;
+
+    //만약 밀려난 위치가 게임판 밖이라면 산타는 게임에서 탈락
+    if(ny<1||ny>N || nx<1||nx>N) {
+        santa[n].status = 2;
+        //cout << "Santa #" << n << " dashed to rudolf and was bumped out!!!! \n";
+    }
+    // 만약 밀려난 칸에 다른 산타가 있는 경우 상호작용이 발생
+    else {
+        if (1<=board[ny][nx] && board[ny][nx]<=P)
+            interaction(board[ny][nx], ny, nx, Santa_dy[(dir+2)%4], Santa_dx[(dir+2)%4]);
+        board[ny][nx] = n;
+        santa[n].location.y = ny;
+        santa[n].location.x = nx;
+    }
+
+    return;
+}
+
+void interaction(int n, int y, int x, int diry, int dirx) {
+    // (y, x)의 산타를 1칸 (dir, dirx) 방향으로 밀었을 때 
+    int ny = y + diry;
+    int nx = x + dirx;
+
+    // 밀린 칸이 보드 밖이면 탈락하고 리턴
+    if(ny<1||ny>N || nx<1||nx>N) {
+        santa[n].status = 2;
+        board[y][x] = 0;
+        return;
+    }
+    // 밀린 칸에 다른 산타가 있으면 interacion 호출
+    else if (1<=board[ny][nx] && board[ny][nx]<=P) {
+        interaction(board[ny][nx], ny, nx, diry, dirx);
+    }
+
+    board[ny][nx] = n;
+    santa[n].location.y = ny;
+    santa[n].location.x = nx;
+
+    return;
+}
